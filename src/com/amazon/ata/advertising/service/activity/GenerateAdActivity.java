@@ -40,7 +40,7 @@ public class GenerateAdActivity {
      *      advertisement could be generated.
      */
     public GenerateAdvertisementResponse generateAd(GenerateAdvertisementRequest request) {
-        String customerId = request.getCustomerId();
+        /*String customerId = request.getCustomerId();
         String marketplaceId = request.getMarketplaceId();
         LOG.info(String.format("Generating ad for customerId: %s in marketplace: %s", customerId, marketplaceId));
 
@@ -59,9 +59,41 @@ public class GenerateAdActivity {
                 request.getMarketplaceId()), e);
             response = GenerateAdvertisementResponse.builder()
                     .withAdvertisement(AdvertisementTranslator.toCoral(new EmptyGeneratedAdvertisement()))
+                    .build();*/
+        if (request == null) {
+            LOG.error("GenerateAdvertisementRequest is null");
+            return GenerateAdvertisementResponse.builder()
+                    .withAdvertisement(AdvertisementTranslator.toCoral(new EmptyGeneratedAdvertisement()))
                     .build();
         }
 
-        return response;
+        String customerId = request.getCustomerId();
+        String marketplaceId = request.getMarketplaceId();
+        LOG.info("Generating ad for customerId: {} in marketplace: {}", customerId, marketplaceId);
+
+        try {
+            final GeneratedAdvertisement generatedAd = adSelector.selectAdvertisement(customerId, marketplaceId);
+
+            if (generatedAd == null) {
+                LOG.warn("No advertisement generated for customerId: {} in marketplace: {}", customerId, marketplaceId);
+                return GenerateAdvertisementResponse.builder()
+                        .withAdvertisement(AdvertisementTranslator.toCoral(new EmptyGeneratedAdvertisement()))
+                        .build();
+            }
+
+            return GenerateAdvertisementResponse.builder()
+                    .withAdvertisement(AdvertisementTranslator.toCoral(generatedAd))
+                    .build();
+        } catch (Exception e) {
+            LOG.error("Error generating advertisement for customer: {} in marketplace: {}",
+                    customerId, marketplaceId, e);
+            return GenerateAdvertisementResponse.builder()
+                    .withAdvertisement(AdvertisementTranslator.toCoral(new EmptyGeneratedAdvertisement()))
+                    .build();
+
+
+        }
+
+
     }
 }
