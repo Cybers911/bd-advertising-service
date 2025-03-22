@@ -5,17 +5,20 @@ import com.amazon.ata.advertising.service.targeting.predicate.TargetingPredicate
 import com.amazon.ata.advertising.service.targeting.predicate.TargetingPredicateResult;
 
 import java.util.List;
-import java.util.concurrent.ExecutionException;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 /**
  * Evaluates TargetingPredicates for a given RequestContext.
  */
 public class TargetingEvaluator {
     public static final boolean IMPLEMENTED_STREAMS = true;
-    public static final boolean IMPLEMENTED_CONCURRENCY = false;
+    public static final boolean IMPLEMENTED_CONCURRENCY = true;
     private final RequestContext requestContext;
+    private final ExecutorService executorService;
 
     /**
      * Creates an evaluator for targeting predicates.
@@ -23,6 +26,8 @@ public class TargetingEvaluator {
      */
     public TargetingEvaluator(RequestContext requestContext) {
         this.requestContext = requestContext;
+        this.executorService = Executors.newCachedThreadPool();
+
     }
 
     /**
@@ -63,11 +68,24 @@ public class TargetingEvaluator {
 
     //Update TargetingEvaluator's evaluate method to use a stream instead of a for loop to evaluate the TargetingPredicateResult.
     // This will improve the performance of the method and make it more efficient for large numbers of predicates.
+
     public TargetingPredicateResult evaluate(TargetingGroup targetingGroup) {
         List<TargetingPredicate> targetingPredicates = targetingGroup.getTargetingPredicates();
-        return targetingPredicates.stream()
-               .map(predicate -> predicate.evaluate(requestContext))
-               .reduce(TargetingPredicateResult.TRUE, (result1, result2) -> result1.isTrue() && result2.isTrue()? TargetingPredicateResult.TRUE : TargetingPredicateResult.FALSE);
+
+        List<Future<TargetingPredicateResult>> futures = targetingPredicates.stream()
+               .map(predicate -> executorService.submit(() -> predicate.evaluate(requestContext)))
+               .collect(Collectors.toList());
+
+        boolean allTrue = futures.stream()
+                .map(future -> {
+                    try {
+                        return future.get();
+                    } catch (Exception e) {
+                        return TargetingPredicateResult.FALSE;
+                    }
+                })
+                .allMatch(predicateResult -> TargetingPredicateResult.TRUE.equals(predicateResult));
+        return allTrue? TargetingPredicateResult.TRUE : TargetingPredicateResult.FALSE;
 
 
         // If the implementation supports Java 8 Streams, you can also use parallel streams for better performance:

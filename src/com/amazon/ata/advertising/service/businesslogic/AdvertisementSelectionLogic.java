@@ -214,5 +214,5 @@ public class AdvertisementSelectionLogic {
                 .map(ad -> new GeneratedAdvertisement(ad))
                 .orElse(new EmptyGeneratedAdvertisement());
     }
-    
+
 }
