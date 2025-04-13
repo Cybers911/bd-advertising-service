@@ -201,18 +201,29 @@ public class AdvertisementSelectionLogic {
     
         RequestContext requestContext = new RequestContext(customerId, marketplaceId);
         TargetingEvaluator evaluator = new TargetingEvaluator(requestContext);
-    
-        Optional<AdvertisementContent> eligibleAd = contents.stream()
+        
+        //TreeMap to store advertisement content by their click-through rates in descending order
+            // Key: click-through rate, Value: advertisement content
+        //TreeMap<Double, AdvertisementContent> sortedAds = new TreeMap<>(Comparator.reverseOrder());
+
+        TreeMap<Double, AdvertisementContent> sortedAds = new TreeMap<>(Comparator.reverseOrder());
+
+        contents.stream()
                 .filter(content -> {
                     List<TargetingGroup> targetingGroups = targetingGroupDao.get(content.getContentId());
                     return targetingGroups.stream()
                             .anyMatch(group -> evaluator.evaluate(group).isTrue());
                 })
-                .findAny();
-    
-        return eligibleAd
-                .map(ad -> new GeneratedAdvertisement(ad))
-                .orElse(new EmptyGeneratedAdvertisement());
+                .forEach(content -> {
+                    targetingGroupDao.get(content.getContentId()).stream()
+                            .mapToDouble(TargetingGroup::getClickThroughRate)
+                            .max()
+                            .ifPresent(ctr -> sortedAds.put(ctr, content));
+                });
+
+        return sortedAds.isEmpty()
+                ? new EmptyGeneratedAdvertisement()
+                : new GeneratedAdvertisement(sortedAds.firstEntry().getValue());
     }
 
 }
